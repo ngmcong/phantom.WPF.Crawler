@@ -22,14 +22,14 @@
                 <wv2:WebView2 Name="webBrowser" NavigationCompleted="WebBrowser_NavigationCompleted" />
             </TabItem>
             <TabItem Header="Item Controls">
-                <DataGrid ItemsSource="{Binding CrawlItems}" AutoGenerateColumns="False" CanUserAddRows="False">
+                <DataGrid ItemsSource="{Binding ItemsView}" AutoGenerateColumns="False" CanUserAddRows="False">
                     <DataGrid.Columns>
                         <DataGridTemplateColumn>
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel>
-                                        <Button Command="{Binding Path=DataContext.OpenLinkCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                CommandParameter="{Binding}" Content="Unfollow" Height="24" />
+                                        <Button Content="Unfollow" Height="24" Click="ItemButton_Clicked" />
+                                        <Button Content="Invisible" Height="24" Click="ItemButton_Clicked" />
                                     </StackPanel>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
@@ -37,11 +37,11 @@
                         <DataGridTemplateColumn>
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Image Width="150" Height="150" Source="{Binding Image}"></Image>
+                                    <Image Width="200" Source="{Binding Image}"></Image>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Title">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock>

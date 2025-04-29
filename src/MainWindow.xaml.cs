@@ -4,8 +4,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Documents;
-using System.Windows.Input;
 
 namespace Crawler
 {
@@ -161,6 +161,22 @@ namespace Crawler
                 }
             }
         }
+        private void ItemButton_Clicked(object sender, RoutedEventArgs e)
+        {
+            var button = sender as System.Windows.Controls.Button;
+            if (button == null) return;
+            var model = button.DataContext as CrawlItem;
+            if (model == null) return;
+            var content = button.Content.ToString();
+            if (content == "Unfollow")
+            {
+                _currentContext.ExecuteUnfollowLink(model);
+            }
+            else if (content == "Invisible")
+            {
+                _currentContext.ExecuteInvisibleLink(model);
+            }
+        }
     }
     public class CrawlItem : INotifyPropertyChanged
     {
@@ -224,6 +240,16 @@ namespace Crawler
         {
             return this.HashString.GetHashCode();
         }
+        private bool _isInvisible = false;
+        public bool IsInvisible
+        {
+            get { return _isInvisible; }
+            set
+            {
+                _isInvisible = value;
+                OnPropertyChanged(nameof(IsInvisible));
+            }
+        }
     }
     public class MainWindowModel : INotifyPropertyChanged
     {
@@ -235,7 +261,6 @@ namespace Crawler
         }
         #endregion Implementation
         #region Properties
-        public ICommand OpenLinkCommand { get; }
         private ObservableCollection<CrawlItem>? _crawlItems;
         public ObservableCollection<CrawlItem>? CrawlItems
         {
@@ -247,11 +272,36 @@ namespace Crawler
             }
         }
         public List<string> InvisibleItems = new List<string>();
+        public ICollectionView ItemsView { get; }
+        private string? _filterText;
+        public string? FilterText
+        {
+            get { return _filterText; }
+            set
+            {
+                _filterText = value;
+                ItemsView.Refresh(); // Apply the filter again
+                OnPropertyChanged(nameof(FilterText));
+            }
+        }
+        private bool FilterItems(object item)
+        {
+            //if (string.IsNullOrEmpty(FilterText)) return true;
+            var dataItem = item as CrawlItem;
+            return dataItem!.IsInvisible == false;
+            //if (dataItem != null)
+            //{
+            //    // Define your filtering logic here based on dataItem properties
+            //    //return dataItem.SomeProperty.Contains(FilterText, StringComparison.OrdinalIgnoreCase);
+            //    return true;
+            //}
+            //return false;
+        }
+
         #endregion
         #region Events
         public MainWindowModel()
         {
-            OpenLinkCommand = new RelayCommand(ExecuteOpenLink); // Or a similar ICommand implementation
             if (File.Exists("invisible.txt"))
             {
                 using StreamReader sr = new StreamReader("invisible.txt");
@@ -261,15 +311,23 @@ namespace Crawler
                     InvisibleItems = System.Text.Json.JsonSerializer.Deserialize<List<string>>(json)!;
                 }
             }
+            CrawlItems = new ObservableCollection<CrawlItem>();
+            ItemsView = CollectionViewSource.GetDefaultView(CrawlItems);
+            ItemsView.Filter = FilterItems;
         }
-        private void ExecuteOpenLink(object? parameter)
+        public void ExecuteUnfollowLink(CrawlItem model)
         {
-            var model = parameter as CrawlItem;
             if (model == null) return;
             InvisibleItems.Add(model.Href!);
             using StreamWriter sw = new StreamWriter("invisible.txt");
             sw.Write(System.Text.Json.JsonSerializer.Serialize(InvisibleItems));
             CrawlItems!.Remove(model);
+        }
+        public void ExecuteInvisibleLink(CrawlItem model)
+        {
+            if (model == null) return;
+            model.IsInvisible = true;
+            ItemsView.Refresh();
         }
         #endregion Events
     }
