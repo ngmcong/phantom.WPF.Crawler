@@ -75,7 +75,7 @@ namespace Crawler
                         Title = correctContent(title),
                         Duration = correctContent(duration),
                     };
-                    if (_currentContext.InvisibleItems.Contains(model)) continue;
+                    if (_currentContext.InvisibleItems.Contains(model.Href!)) continue;
                     crawlItems.Add(model);
                 }
                 var nextUrl = await webBrowser.ExecuteScriptAsync($"document.querySelector('div.main-wrap').querySelector('a.prev-next-list-link.prev-next-list-link--next').getAttribute('href')");
@@ -246,7 +246,7 @@ namespace Crawler
                 OnPropertyChanged(nameof(CrawlItems));
             }
         }
-        public List<CrawlItem> InvisibleItems = new List<CrawlItem>();
+        public List<string> InvisibleItems = new List<string>();
         #endregion
         #region Events
         public MainWindowModel()
@@ -258,7 +258,7 @@ namespace Crawler
                 string? json = sr.ReadToEnd();
                 if (string.IsNullOrEmpty(json) == false)
                 {
-                    InvisibleItems = System.Text.Json.JsonSerializer.Deserialize<List<CrawlItem>>(json)!;
+                    InvisibleItems = System.Text.Json.JsonSerializer.Deserialize<List<string>>(json)!;
                 }
             }
         }
@@ -266,7 +266,7 @@ namespace Crawler
         {
             var model = parameter as CrawlItem;
             if (model == null) return;
-            InvisibleItems.Add(model);
+            InvisibleItems.Add(model.Href!);
             using StreamWriter sw = new StreamWriter("invisible.txt");
             sw.Write(System.Text.Json.JsonSerializer.Serialize(InvisibleItems));
             CrawlItems!.Remove(model);
