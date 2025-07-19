@@ -47,7 +47,12 @@ namespace Crawler
         {
             try
             {
-                string script = $@"document.querySelector('div.main-wrap').querySelector('div.thumb-list.thumb-list--sidebar.thumb-list--middle-line.thumb-list--bigger-with-cube').querySelectorAll('div.thumb-list__item.video-thumb.video-thumb--type-video')";
+                string script = $@"Array.from(document.querySelectorAll(""a.movie-item.m-block"")).map(item => ({{
+                        href: item.href,
+                        image: item.querySelector(""img"").src,
+                        duration: """",
+                        title: item.getAttribute(""title""),
+                      }}))";
                 var result = await webBrowser.CoreWebView2.CallDevToolsProtocolMethodAsync(
                     "Runtime.evaluate",
                     JsonSerializer.Serialize(new
@@ -57,28 +62,25 @@ namespace Crawler
                     }));
 
                 string? jsonResult = await webBrowser.ExecuteScriptAsync(script);
-                jsonResult = await webBrowser.ExecuteScriptAsync("document.querySelector('div.main-wrap').querySelector('div.thumb-list.thumb-list--sidebar.thumb-list--middle-line.thumb-list--bigger-with-cube').querySelectorAll('div.thumb-list__item.video-thumb.video-thumb--type-video').length");
                 if (string.IsNullOrEmpty(jsonResult)) return (null, null);
-                var countQty = int.Parse(jsonResult);
-                List<CrawlItem> crawlItems = new List<CrawlItem>();
-                string correctContent(string content) => content.TrimStart('\"').TrimEnd('\"');
-                for (int qty = 0; qty < countQty; qty++)
+                var options = new JsonSerializerOptions
                 {
-                    var href = await webBrowser.ExecuteScriptAsync($"document.querySelector('div.main-wrap').querySelector('div.thumb-list.thumb-list--sidebar.thumb-list--middle-line.thumb-list--bigger-with-cube').querySelectorAll('div.thumb-list__item.video-thumb.video-thumb--type-video')[{qty}].querySelector('a.video-thumb__image-container.role-pop.thumb-image-container').getAttribute('href')");
-                    var image = await webBrowser.ExecuteScriptAsync($"document.querySelector('div.main-wrap').querySelector('div.thumb-list.thumb-list--sidebar.thumb-list--middle-line.thumb-list--bigger-with-cube').querySelectorAll('div.thumb-list__item.video-thumb.video-thumb--type-video')[{qty}].querySelector('a.video-thumb__image-container.role-pop.thumb-image-container').querySelector('img').getAttribute('src')");
-                    var duration = await webBrowser.ExecuteScriptAsync($"document.querySelector('div.main-wrap').querySelector('div.thumb-list.thumb-list--sidebar.thumb-list--middle-line.thumb-list--bigger-with-cube').querySelectorAll('div.thumb-list__item.video-thumb.video-thumb--type-video')[{qty}].querySelector('a.video-thumb__image-container.role-pop.thumb-image-container').querySelector('div[data-role=video-duration]').innerText");
-                    var title = await webBrowser.ExecuteScriptAsync($"document.querySelector('div.main-wrap').querySelector('div.thumb-list.thumb-list--sidebar.thumb-list--middle-line.thumb-list--bigger-with-cube').querySelectorAll('div.thumb-list__item.video-thumb.video-thumb--type-video')[{qty}].querySelector('div.video-thumb-info').querySelector('a.root-48288').innerText");
-                    var model = new CrawlItem()
-                    {
-                        Href = correctContent(href),
-                        Image = correctContent(image),
-                        Title = correctContent(title),
-                        Duration = correctContent(duration),
-                    };
-                    if (_currentContext.InvisibleItems.Contains(model.Href!)) continue;
-                    crawlItems.Add(model);
-                }
-                var nextUrl = await webBrowser.ExecuteScriptAsync($"document.querySelector('div.main-wrap').querySelector('a.prev-next-list-link.prev-next-list-link--next').getAttribute('href')");
+                    PropertyNameCaseInsensitive = true
+                };
+                var crawlItems = JsonSerializer.Deserialize<IEnumerable<CrawlItem>>(jsonResult, options);
+                crawlItems = from cr in crawlItems
+                             join iv in _currentContext.InvisibleItems.GroupBy(x => x).Select(x => x.Key) on cr.Href equals iv into leftIV
+                             from iv in leftIV.DefaultIfEmpty()
+                             where iv == null
+                             select cr;
+                string correctContent(string content) => content.TrimStart('\"').TrimEnd('\"');
+                var nextUrl = await webBrowser.ExecuteScriptAsync($@"(function() {{
+                    const element = document.querySelectorAll(""a.page-numbers"");
+                    if (element) {{
+                        return element[element.length - 1].href;
+                    }}
+                    return '';
+                }})()");
                 return (crawlItems, correctContent(nextUrl));
             }
             catch (Exception ex)
@@ -297,30 +299,32 @@ namespace Crawler
             //}
             //return false;
         }
+        private readonly string invisiblePath = "H:\\invisible.txt";
 
         #endregion
         #region Events
         public MainWindowModel()
         {
-            if (File.Exists("invisible.txt"))
+            if (File.Exists(invisiblePath))
             {
-                using StreamReader sr = new StreamReader("invisible.txt");
+                using StreamReader sr = new StreamReader(invisiblePath);
                 string? json = sr.ReadToEnd();
                 if (string.IsNullOrEmpty(json) == false)
                 {
                     InvisibleItems = System.Text.Json.JsonSerializer.Deserialize<List<string>>(json)!;
                 }
+                sr.Close();
+                sr.Dispose();
             }
             CrawlItems = new ObservableCollection<CrawlItem>();
             ItemsView = CollectionViewSource.GetDefaultView(CrawlItems);
             ItemsView.Filter = FilterItems;
         }
-        public void ExecuteUnfollowLink(CrawlItem model)
+        public async void ExecuteUnfollowLink(CrawlItem model)
         {
             if (model == null) return;
             InvisibleItems.Add(model.Href!);
-            using StreamWriter sw = new StreamWriter("invisible.txt");
-            sw.Write(System.Text.Json.JsonSerializer.Serialize(InvisibleItems));
+            await File.WriteAllTextAsync(invisiblePath, System.Text.Json.JsonSerializer.Serialize(InvisibleItems));
             CrawlItems!.Remove(model);
         }
         public void ExecuteInvisibleLink(CrawlItem model)
