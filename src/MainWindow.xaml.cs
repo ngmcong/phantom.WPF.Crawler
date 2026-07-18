@@ -305,7 +305,7 @@ namespace Crawler
             //}
             //return false;
         }
-        private readonly string invisiblePath = "H:\\invisible.txt";
+        private readonly string invisiblePath = "F:\\Downloads\\invisible.txt";
 
         #endregion
         #region Events
