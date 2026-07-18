@@ -47,12 +47,16 @@ namespace Crawler
         {
             try
             {
-                string script = $@"Array.from(document.querySelectorAll(""a.movie-item.m-block"")).map(item => ({{
-                        href: item.href,
-                        image: item.querySelector(""img"").src,
-                        duration: """",
-                        title: item.getAttribute(""title""),
-                      }}))";
+                string script = $@"(function() {{
+                const dataArrayString = document.querySelectorAll(""li.pcVideoListItem.js-pop.videoblock"");
+                const datas = Array.from(dataArrayString).map(item => ({{
+                    href: item.querySelector(""div.wrap"").querySelector(""div.phimage"").querySelector(""a"").href,
+                    image: item.querySelector(""div.wrap"").querySelector(""div.phimage"").querySelector(""a"").querySelector(""img"").src,
+                    duration: item.querySelector(""div.wrap"").querySelector(""div.phimage"").querySelector(""a"").querySelector(""var"").innerText,
+                    title: item.querySelector(""div.wrap"").querySelector(""div.thumbnail-info-wrapper"").querySelector(""span.title"").querySelector(""a"").title,
+                }}));
+                return JSON.stringify(datas);
+                }})()";
                 var result = await webBrowser.CoreWebView2.CallDevToolsProtocolMethodAsync(
                     "Runtime.evaluate",
                     JsonSerializer.Serialize(new
@@ -61,27 +65,29 @@ namespace Crawler
                         returnByValue = true
                     }));
 
-                string? jsonResult = await webBrowser.ExecuteScriptAsync(script);
+                var jsonResult = await webBrowser.ExecuteScriptAsync(script);
                 if (string.IsNullOrEmpty(jsonResult)) return (null, null);
+                jsonResult = JsonSerializer.Deserialize<string>(jsonResult);
                 var options = new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 };
-                var crawlItems = JsonSerializer.Deserialize<IEnumerable<CrawlItem>>(jsonResult, options);
+                var crawlItems = JsonSerializer.Deserialize<IEnumerable<CrawlItem>>(jsonResult!, options);
                 crawlItems = from cr in crawlItems
                              join iv in _currentContext.InvisibleItems.GroupBy(x => x).Select(x => x.Key) on cr.Href equals iv into leftIV
                              from iv in leftIV.DefaultIfEmpty()
                              where iv == null
                              select cr;
-                string correctContent(string content) => content.TrimStart('\"').TrimEnd('\"');
+                string correctContent(string content) => content?.TrimStart('\"').TrimEnd('\"') ?? string.Empty;
                 var nextUrl = await webBrowser.ExecuteScriptAsync($@"(function() {{
-                    const element = document.querySelectorAll(""a.page-numbers"");
-                    if (element) {{
-                        return element[element.length - 1].href;
-                    }}
-                    return '';
-                }})()");
-                return (crawlItems, correctContent(nextUrl));
+                const element = document.querySelectorAll(""li.page_next"");
+                if (element) {{
+                    return element[element.length - 1].querySelector(""a"").href;
+                }}
+                return '';
+                }})();");
+                nextUrl = JsonSerializer.Deserialize<string>(nextUrl);
+                return (crawlItems, correctContent(nextUrl!));
             }
             catch (Exception ex)
             {
