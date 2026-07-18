@@ -150,6 +150,7 @@ namespace Crawler
                     _currentContext.CrawlItems.Add(item);
                 }
             }
+            if (_currentContext.CrawlItems?.Count() > 1000) return;
             var nextUrl = retVal.NextUrl!;
             if (string.IsNullOrEmpty(nextUrl)) return;
             webBrowser.Source = new Uri(nextUrl);
