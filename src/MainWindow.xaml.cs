@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using phantom.WPF.Crawler;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -14,6 +15,33 @@ namespace Crawler
     /// </summary>
     public partial class MainWindow : Window
     {
+        #region Properties
+        private MainWindowModel _currentContext = new MainWindowModel();
+        private List<SourcePath> _sourcePaths = new List<SourcePath>
+        {
+            new SourcePath
+            {
+                name = "xvideos.com",
+                crawlJquery = $@"(function() {{
+                const dataArrayString = document.querySelectorAll(""div.frame-block.thumb-block"");
+                const datas = Array.from(dataArrayString).map(item => ({{
+                    href: item.querySelector(""div.thumb-under"").querySelector(""a"").href,
+                    image: item.querySelector(""div.thumb-inside"").querySelector(""img"").getAttribute(""src""),
+                    duration: item.querySelector(""div.thumb-under"").querySelector(""p.metadata"").querySelector(""span.duration"").innerHTML,
+                    title: item.querySelector(""div.thumb-under"").querySelector(""p.title"").querySelector(""a"").textContent,
+                }}));
+                return JSON.stringify(datas);
+                }})();",
+                nextPageJquery = $@"(function() {{
+                const element = document.querySelector(""div.pagination "").querySelector(""a.next-page"");
+                if (element) {{
+                    return element.href;
+                }}
+                return '';
+                }})();"
+            },
+        };
+        #endregion
         #region Methods
         private async Task<string?> FindElementInnerTextDevToolsAsync(string selector)
         {
@@ -47,7 +75,8 @@ namespace Crawler
         {
             try
             {
-                string script = $@"(function() {{
+                var url = webBrowser.Source?.AbsoluteUri ?? string.Empty;
+                string crawlScript = $@"(function() {{
                 const dataArrayString = document.querySelectorAll(""li.pcVideoListItem.js-pop.videoblock"");
                 const datas = Array.from(dataArrayString).map(item => ({{
                     href: item.querySelector(""div.wrap"").querySelector(""div.phimage"").querySelector(""a"").href,
@@ -57,15 +86,27 @@ namespace Crawler
                 }}));
                 return JSON.stringify(datas);
                 }})()";
+                var nextUrlScript = $@"(function() {{
+                const element = document.querySelectorAll(""li.page_next"");
+                if (element) {{
+                    return element[element.length - 1].querySelector(""a"").href;
+                }}
+                return '';
+                }})();";
+                if (url.Contains("xvideos.com"))
+                {
+                    crawlScript = _sourcePaths.FirstOrDefault(x => x.name == "xvideos.com")?.crawlJquery ?? crawlScript;
+                    nextUrlScript = _sourcePaths.FirstOrDefault(x => x.name == "xvideos.com")?.nextPageJquery ?? nextUrlScript;
+                }
                 var result = await webBrowser.CoreWebView2.CallDevToolsProtocolMethodAsync(
                     "Runtime.evaluate",
                     JsonSerializer.Serialize(new
                     {
-                        expression = script,
+                        expression = crawlScript,
                         returnByValue = true
                     }));
 
-                var jsonResult = await webBrowser.ExecuteScriptAsync(script);
+                var jsonResult = await webBrowser.ExecuteScriptAsync(crawlScript);
                 if (string.IsNullOrEmpty(jsonResult)) return (null, null);
                 jsonResult = JsonSerializer.Deserialize<string>(jsonResult);
                 var options = new JsonSerializerOptions
@@ -79,13 +120,7 @@ namespace Crawler
                              where iv == null
                              select cr;
                 string correctContent(string content) => content?.TrimStart('\"').TrimEnd('\"') ?? string.Empty;
-                var nextUrl = await webBrowser.ExecuteScriptAsync($@"(function() {{
-                const element = document.querySelectorAll(""li.page_next"");
-                if (element) {{
-                    return element[element.length - 1].querySelector(""a"").href;
-                }}
-                return '';
-                }})();");
+                var nextUrl = await webBrowser.ExecuteScriptAsync(nextUrlScript);
                 nextUrl = JsonSerializer.Deserialize<string>(nextUrl);
                 return (crawlItems, correctContent(nextUrl!));
             }
@@ -109,9 +144,6 @@ namespace Crawler
             }
         }
         #endregion Methods
-        #region Properties
-        private MainWindowModel _currentContext = new MainWindowModel();
-        #endregion
         public MainWindow()
         {
             InitializeComponent();
