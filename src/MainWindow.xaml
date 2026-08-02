@@ -8,6 +8,9 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800"
         Loaded="Window_Loaded">
+    <Window.Resources>
+        <local:Base64ToImageConverter x:Key="Base64ToImageConverter"></local:Base64ToImageConverter>
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -47,9 +50,14 @@
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Image Width="200"
-                                           Source="{Binding Image,TargetNullValue='pack://application:,,,/Assets/ErrorImage.png',FallbackValue='pack://application:,,,/Assets/ErrorImage.png',NotifyOnTargetUpdated=True}"
+                                           Source="{Binding Image,
+                                                            Converter={StaticResource Base64ToImageConverter},
+                                                            TargetNullValue='pack://application:,,,/Assets/ErrorImage.png',
+                                                            FallbackValue='pack://application:,,,/Assets/ErrorImage.png',
+                                                            NotifyOnTargetUpdated=True}"
                                            ImageFailed="Image_ImageFailed"
-                                           TargetUpdated="Image_TargetUpdated">
+                                           TargetUpdated="Image_TargetUpdated"
+                                           ToolTip="{Binding Image}">
                                     </Image>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>

@@ -176,6 +176,31 @@ namespace Crawler
                 }})();
                 "
             },
+            new SourcePath
+            {
+                name = "supjav.com",
+                crawlJquery = $@"
+                (function() {{
+                    const dataArrayString = document.querySelectorAll(""div.post"");
+                    const datas = Array.from(dataArrayString).map(item => ({{
+                        href: item.querySelector(""a"").href,
+                        image: item.querySelector(""a"").querySelector(""img"").src,
+                        duration: """",
+                        title: item.querySelector(""a"").getAttribute(""title""),
+                    }}));
+                    return JSON.stringify(datas);
+                }})();
+                ",
+                nextPageJquery = $@"
+                (function() {{
+                    const element = document.querySelector(""li.next-page"").querySelector(""a"");
+                    if (element) {{
+                        return element.href;
+                    }}
+                    return '';
+                }})();
+                "
+            },
         };
         #endregion
 
