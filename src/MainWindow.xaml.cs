@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Documents;
+using System.Windows.Media.Imaging;
 
 namespace Crawler
 {
@@ -61,8 +62,123 @@ namespace Crawler
                 return '';
                 }})();"
             },
+            new SourcePath
+            {
+                name = "avtoday.io",
+                crawlJquery = $@"
+                (function() {{
+                    const dataArrayString = document.querySelectorAll(""div.thumbnail"");
+                    const datas = Array.from(dataArrayString).map(item => {{
+                        const videoEl = item.querySelector(""div.video-card"").querySelector(""a"").querySelector(""video"");
+                        let imageUrl = """";
+                        if (videoEl) {{
+                        const style = videoEl.style.background;
+                        imageUrl = ""https://avtoday.io/"" + style.slice(style.indexOf('url(""') + 5, style.lastIndexOf('"")'));
+                        }}
+                        return {{
+                        href: item.querySelector(""div.video-card"").querySelector(""a"").href,
+                        image: imageUrl,
+                        duration: """",
+                        title: item.querySelector(""div.video-title"").querySelector(""a"").textContent,
+                        }};
+                    }});
+                    return JSON.stringify(datas);
+                }})();
+                ",
+                nextPageJquery = $@"
+                (function() {{
+                    const elements = document.querySelectorAll(""ul.pagination li.page-item a.page-link"");
+                    if (elements.length > 0) {{
+                        // Lấy phần tử cuối cùng trong danh sách (thường là nút Next hoặc trang cuối)
+                        const lastItem = elements[elements.length - 1];
+                        if (lastItem.classList.contains('active')) {{
+                        return '';
+                        }}
+                        // Trả về href tuyệt đối
+                        return lastItem.href;
+                    }}
+                    return '';
+                }})();
+                "
+            },
+            new SourcePath
+            {
+                name = "xhamster.com",
+                crawlJquery = $@"
+                (function() {{
+                    function wait(ms) {{
+                        const start = Date.now();
+                        while (Date.now() - start < ms) {{}}
+                    }}
+
+                    function waitForData(selector, maxTry) {{
+                        for (let i = 0; i < maxTry; i++) {{
+                        const items = document.querySelectorAll(selector);
+                        if (items.length > 0) {{
+                            // Lấy item đầu tiên để kiểm tra
+                            const firstItem = items[0];
+                            // Tìm thẻ <a>, sau đó tìm <img> bên trong <a>
+                            const linkInItem = firstItem.querySelector(""a"");
+                            const imgInLink = linkInItem ? linkInItem.querySelector(""img"") : null;
+
+                            // Điều kiện: Có ảnh và src phải là link thật (http...)
+                            if (imgInLink && imgInLink.src && imgInLink.src.startsWith('http')) {{
+                            return true;
+                            }}
+                        }}
+                        // Sync wait 200ms
+                        const start = Date.now();
+                        while (Date.now() - start < 200) {{}}
+                        }}
+                        return false;
+                    }}
+
+                    // Đợi cho đến khi các item video xuất hiện và có ảnh thật
+                    waitForData(""div.thumb-list__item.video-thumb"", 50);
+
+                    const items = document.querySelectorAll(
+                        ""div.thumb-list__item.video-thumb.video-thumb--type-video""
+                    );
+
+                    const data = [];
+
+                    for (let i = 0; i < items.length; i++) {{
+                        const item = items[i];
+                        const link = item.querySelector(""a"");
+                        let img = link ? link.querySelector(""img"") : null;
+                        // let retry = 0;
+                        // while (!img && retry < 5) {{
+                        //   wait(200); 
+                        //   img = link ? link.querySelector(""img"") : null;
+                        //   retry++;
+                        // }}
+                        const titleEl = item.querySelector(""a.video-thumb-info__name"");
+
+                        data.push({{
+                        href: link ? link.href : """",
+                        image: img ? img.src : """",
+                        duration: """",
+                        title: titleEl
+                            ? titleEl.textContent.trim()
+                            : (link ? link.getAttribute(""aria-label"") : """")
+                        }});
+                    }}
+                    return JSON.stringify(data);
+                    }})();
+                ",
+                nextPageJquery = $@"
+                (function() {{
+                    const element = document.querySelector(""div.main-wrap"").querySelector(""a.prev-next-list-link.prev-next-list-link--next"");
+                    if (element) {{
+                        return element.getAttribute(""href"");
+                    }}
+                    return '';
+                }})();
+                "
+            },
         };
         #endregion
+
         #region Methods
         private async Task<string?> FindElementInnerTextDevToolsAsync(string selector)
         {
@@ -166,6 +282,7 @@ namespace Crawler
             }
         }
         #endregion Methods
+
         public MainWindow()
         {
             InitializeComponent();
@@ -240,6 +357,29 @@ namespace Crawler
                 _currentContext.ExecuteInvisibleLink(model);
             }
         }
+        private void Image_ImageFailed(object sender, ExceptionRoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Image image && image.DataContext is CrawlItem failedItem)
+            {
+                failedItem.IsImageError = true;
+            }
+        }
+        private void Image_TargetUpdated(object sender, DataTransferEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Image image && image.DataContext is CrawlItem failedItem)
+            {
+                failedItem.IsImageError = true;
+            }
+        }
+        private void HideErrorsButton_Clicked(object sender, RoutedEventArgs e)
+        {
+            if (_currentContext?.CrawlItems == null) return;
+            foreach (var item in _currentContext.CrawlItems)
+            {
+                item.IsInvisible = item.IsImageError || string.IsNullOrEmpty(item.Image);
+            }
+            _currentContext.ItemsView.Refresh();
+        }
     }
     public class CrawlItem : INotifyPropertyChanged
     {
@@ -250,6 +390,7 @@ namespace Crawler
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
         #endregion Implementation
+
         private string? _href;
         public string? Href
         {
@@ -313,6 +454,16 @@ namespace Crawler
                 OnPropertyChanged(nameof(IsInvisible));
             }
         }
+        private bool _isImageError = false;
+        public bool IsImageError
+        {
+            get { return _isImageError; }
+            set
+            {
+                _isImageError = value;
+                OnPropertyChanged(nameof(IsImageError));
+            }
+        }
     }
     public class MainWindowModel : INotifyPropertyChanged
     {
@@ -323,6 +474,7 @@ namespace Crawler
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
         #endregion Implementation
+
         #region Properties
         private ObservableCollection<CrawlItem>? _crawlItems;
         public ObservableCollection<CrawlItem>? CrawlItems
@@ -361,8 +513,8 @@ namespace Crawler
             //return false;
         }
         private readonly string invisiblePath = "F:\\Downloads\\invisible.txt";
-
         #endregion
+
         #region Events
         public MainWindowModel()
         {
