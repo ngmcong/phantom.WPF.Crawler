@@ -15,8 +15,16 @@
         </Grid.RowDefinitions>
         <StackPanel>
             <TextBox x:Name="txtUrl" MinWidth="400" Margin="10" />
-            <Button x:Name="btnStart" Content="Start" Click="StartButton_Clicked" />
-            <Button x:Name="btnHideError" Content="Hide Errors" Click="HideErrorsButton_Clicked"/>
+            <StackPanel Orientation="Horizontal">
+                <StackPanel.Resources>
+                    <!-- Adds 10px right margin to every Button inside this StackPanel -->
+                    <Style TargetType="Button">
+                        <Setter Property="Margin" Value="0,0,10,0" />
+                    </Style>
+                </StackPanel.Resources>
+                <Button x:Name="btnStart" Content="Start" Click="StartButton_Clicked" />
+                <Button x:Name="btnHideError" Content="Hide Errors" Click="HideErrorsButton_Clicked"/>
+            </StackPanel>
         </StackPanel>
         <TabControl x:Name="tabControl" Grid.Row="1">
             <TabItem Header="WebView">

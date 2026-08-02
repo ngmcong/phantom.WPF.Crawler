@@ -368,7 +368,12 @@ namespace Crawler
         {
             if (sender is System.Windows.Controls.Image image && image.DataContext is CrawlItem failedItem)
             {
-                failedItem.IsImageError = true;
+                if (image.Source is BitmapImage bitmap)
+                {
+                    string uriString = bitmap.UriSource?.ToString() ?? "";
+                    // 2. Kiểm tra xem URI có chứa tên ảnh lỗi không
+                    if (uriString.Contains("ErrorImage.png")) failedItem.IsImageError = true;
+                }
             }
         }
         private void HideErrorsButton_Clicked(object sender, RoutedEventArgs e)
