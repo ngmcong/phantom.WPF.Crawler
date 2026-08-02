@@ -227,6 +227,31 @@ namespace Crawler
                 }})();
                 "
             },
+            new SourcePath
+            {
+                name = "javhd",
+                crawlJquery = $@"
+                (function() {{
+                    const dataArrayString = document.querySelectorAll(""a.movie-item.m-block"");
+                    const datas = Array.from(dataArrayString).map(item => ({{
+                        href: item.href,
+                        image: item.querySelector(""img"").src,
+                        duration: """",
+                        title: item.getAttribute(""title""),
+                    }}));
+                    return JSON.stringify(datas);
+                }})();
+                ",
+                nextPageJquery = $@"
+                (function() {{
+                    const element = document.querySelectorAll(""a.page-numbers"");
+                    if (element) {{
+                        return element[element.length - 1].href;
+                    }}
+                    return '';
+                }})();
+                "
+            },
         };
         #endregion
 
