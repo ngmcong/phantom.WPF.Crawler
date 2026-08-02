@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Security.Policy;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Data;
@@ -574,23 +575,17 @@ namespace Crawler
             //}
             //return false;
         }
-        private readonly string invisiblePath = "F:\\Downloads\\invisible.txt";
+        private readonly SqliteHelper invisibleDb = new SqliteHelper("F:\\Downloads\\invisible.db");
+        private async void LoadData()
+        {
+            InvisibleItems = (await invisibleDb.GetAllUrlsAsync()).ToList();
+        }
         #endregion
 
         #region Events
         public MainWindowModel()
         {
-            if (File.Exists(invisiblePath))
-            {
-                using StreamReader sr = new StreamReader(invisiblePath);
-                string? json = sr.ReadToEnd();
-                if (string.IsNullOrEmpty(json) == false)
-                {
-                    InvisibleItems = System.Text.Json.JsonSerializer.Deserialize<List<string>>(json)!;
-                }
-                sr.Close();
-                sr.Dispose();
-            }
+            LoadData();
             CrawlItems = new ObservableCollection<CrawlItem>();
             ItemsView = CollectionViewSource.GetDefaultView(CrawlItems);
             ItemsView.Filter = FilterItems;
@@ -599,7 +594,8 @@ namespace Crawler
         {
             if (model == null) return;
             InvisibleItems.Add(model.Href!);
-            await File.WriteAllTextAsync(invisiblePath, System.Text.Json.JsonSerializer.Serialize(InvisibleItems));
+            var retVal = await invisibleDb.InsertUrlAsync(model.Href!);
+            if (retVal == false) MessageBox.Show("Không thể thêm loại trừ.");
             CrawlItems!.Remove(model);
         }
         public void ExecuteInvisibleLink(CrawlItem model)
