@@ -40,6 +40,27 @@ namespace Crawler
                 return '';
                 }})();"
             },
+            new SourcePath
+            {
+                name = "porntrex.com",
+                crawlJquery = $@"(function() {{
+                const dataArrayString = document.querySelectorAll(""div.video-preview-screen.video-item.thumb-item"");
+                const datas = Array.from(dataArrayString).map(item => ({{
+                    href: item.querySelector(""a"").href,
+                    image: ""https:"" + item.querySelector(""a"").querySelector(""ul.screenshots-list"").querySelector(""li.screenshot-item.active"").getAttribute(""data-src""),
+                    duration: item.querySelector(""div.durations"").querySelector(""i"").innerText,
+                    title: item.querySelector(""p.inf"").querySelector(""a"").title,
+                }}));
+                return JSON.stringify(datas);
+                }})();",
+                nextPageJquery = $@"(function() {{
+                const element = document.querySelector(""li.next"").querySelector(""a"");
+                if (element) {{
+                    return element.href;
+                }}
+                return '';
+                }})();"
+            },
         };
         #endregion
         #region Methods
@@ -93,10 +114,11 @@ namespace Crawler
                 }}
                 return '';
                 }})();";
-                if (url.Contains("xvideos.com"))
+                var sourcePath = _sourcePaths.FirstOrDefault(x => url.Contains(x.name));
+                if (sourcePath != null)
                 {
-                    crawlScript = _sourcePaths.FirstOrDefault(x => x.name == "xvideos.com")?.crawlJquery ?? crawlScript;
-                    nextUrlScript = _sourcePaths.FirstOrDefault(x => x.name == "xvideos.com")?.nextPageJquery ?? nextUrlScript;
+                    crawlScript = sourcePath.crawlJquery ?? crawlScript;
+                    nextUrlScript = sourcePath.nextPageJquery ?? nextUrlScript;
                 }
                 var result = await webBrowser.CoreWebView2.CallDevToolsProtocolMethodAsync(
                     "Runtime.evaluate",
