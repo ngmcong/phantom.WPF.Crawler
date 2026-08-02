@@ -201,6 +201,31 @@ namespace Crawler
                 }})();
                 "
             },
+            new SourcePath
+            {
+                name = "eporner.com",
+                crawlJquery = $@"
+                (function() {{
+                    const images = document.querySelectorAll(""div.mb.hdy"");
+                    const imageData = Array.from(images).map(item => ({{
+                    href: item.querySelector(""div.mbcontent"").querySelector(""a"").href,
+                    image: item.querySelector(""div.mbcontent"").querySelector(""a"").querySelector(""img"").getAttribute(""data-src"") ?? """",
+                    duration: item.querySelector(""div.mbunder"").querySelector(""p.mbstats"").querySelector(""span.mbtim"").textContent,
+                    title: item.querySelector(""div.mbunder"").querySelector(""p.mbtit"").textContent,
+                    }}));
+                    return JSON.stringify(imageData);
+                }})();
+                ",
+                nextPageJquery = $@"
+                (function() {{
+                    const element = document.querySelector(""div.numlist2"").querySelector(""a.nmnext"");
+                    if (element) {{
+                    return element.href;
+                    }}
+                    return '';
+                }})();
+                "
+            },
         };
         #endregion
 
@@ -268,7 +293,14 @@ namespace Crawler
                         expression = crawlScript,
                         returnByValue = true
                     }));
-
+                if (sourcePath?.name == "supjav.com")
+                {
+                    // 1. Cuộn trang xuống để trigger Lazy Load ảnh thật
+                    await webBrowser.ExecuteScriptAsync("window.scrollTo(0, document.body.scrollHeight);");
+                    // 2. Đợi khoảng 1 - 2 giây cho web nạp ảnh
+                    await Task.Delay(1500);
+                    // 3. Thực thi script crawl như bình thường
+                }
                 var jsonResult = await webBrowser.ExecuteScriptAsync(crawlScript);
                 if (string.IsNullOrEmpty(jsonResult)) return (null, null);
                 jsonResult = JsonSerializer.Deserialize<string>(jsonResult);
