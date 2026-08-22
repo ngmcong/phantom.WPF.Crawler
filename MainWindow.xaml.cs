@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Security.Policy;
 using System.Text.Json;
 using System.Windows;
@@ -335,11 +336,11 @@ namespace Crawler
                     PropertyNameCaseInsensitive = true
                 };
                 var crawlItems = JsonSerializer.Deserialize<IEnumerable<CrawlItem>>(jsonResult!, options);
-                crawlItems = from cr in crawlItems
-                             join iv in _currentContext.InvisibleItems.GroupBy(x => x).Select(x => x.Key) on cr.Href equals iv into leftIV
-                             from iv in leftIV.DefaultIfEmpty()
-                             where iv == null
-                             select cr;
+                crawlItems = (from cr in crawlItems
+                              join iv in _currentContext.InvisibleItems on cr.Href equals iv into leftIV
+                              from iv in leftIV.DefaultIfEmpty()
+                              where string.IsNullOrEmpty(iv)
+                              select cr).ToList();
                 string correctContent(string content) => content?.TrimStart('\"').TrimEnd('\"') ?? string.Empty;
                 var nextUrl = await webBrowser.ExecuteScriptAsync(nextUrlScript);
                 nextUrl = JsonSerializer.Deserialize<string>(nextUrl);
@@ -557,7 +558,7 @@ namespace Crawler
     {
         #region Implementation
         public event PropertyChangedEventHandler? PropertyChanged;
-        protected virtual void OnPropertyChanged(string propertyName)
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
@@ -601,9 +602,21 @@ namespace Crawler
             //return false;
         }
         private readonly SqliteHelper invisibleDb = new SqliteHelper("F:\\Downloads\\invisible.db");
+        private bool _isLoaded = false;
+        public bool IsLoaded
+        {
+
+            get { return _isLoaded; }
+            set
+            {
+                _isLoaded = value;
+                OnPropertyChanged();
+            }
+        }
         private async void LoadData()
         {
             InvisibleItems = (await invisibleDb.GetAllUrlsAsync()).ToList();
+            IsLoaded = true;
         }
         #endregion
 
@@ -619,8 +632,16 @@ namespace Crawler
         {
             if (model == null) return;
             InvisibleItems.Add(model.Href!);
-            var retVal = await invisibleDb.InsertUrlAsync(model.Href!);
-            if (retVal == false) MessageBox.Show("Không thể thêm loại trừ.");
+            var retVal = true;
+            try
+            {
+                retVal = await invisibleDb.InsertUrlAsync(model.Href!);
+            }
+            catch (Exception ex)
+            {
+                retVal = false;
+                MessageBox.Show("Không thể thêm loại trừ.\n" + ex.Message);
+            }
             CrawlItems!.Remove(model);
         }
         public void ExecuteInvisibleLink(CrawlItem model)

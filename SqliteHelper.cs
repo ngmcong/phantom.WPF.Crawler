@@ -43,7 +43,7 @@ namespace Crawler
                 await connection.OpenAsync();
 
                 // Dùng INSERT OR IGNORE để nếu chèn URL đã tồn tại thì sẽ bỏ qua mà không quăng Exception
-                string insertSql = "INSERT OR IGNORE INTO Urls (Url) VALUES (@url);";
+                string insertSql = "INSERT INTO Urls (Url) VALUES (@url);";
 
                 using (var command = new SqliteCommand(insertSql, connection))
                 {

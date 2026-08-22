@@ -25,7 +25,7 @@
                         <Setter Property="Margin" Value="0,0,10,0" />
                     </Style>
                 </StackPanel.Resources>
-                <Button x:Name="btnStart" Content="Start" Click="StartButton_Clicked" />
+                <Button x:Name="btnStart" Content="Start" Click="StartButton_Clicked" IsEnabled="{Binding IsLoaded, Mode=OneWay}" />
                 <Button x:Name="btnHideError" Content="Hide Errors" Click="HideErrorsButton_Clicked"/>
             </StackPanel>
         </StackPanel>
